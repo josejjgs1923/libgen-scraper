@@ -5,7 +5,8 @@ usando una query y opciones de busqueda.
 """
 
 from argparse import REMAINDER, SUPPRESS, ArgumentParser
-from asyncio import get_event_loop
+
+# from asyncio import get_event_loop
 from pathlib import Path
 from re import compile
 from typing import Any, Optional
@@ -23,26 +24,24 @@ numeros_iniciales = compile(r"^\d+")
 
 
 # clases principales para descargar imagenes y procesar el html
-def background(f):
-    def wrapped(*args, **kwargs):
-        return get_event_loop().run_in_executor(None, f, *args, **kwargs)
-
-    return wrapped
+# def background(f):
+#     def wrapped(*args, **kwargs):
+#         return get_event_loop().run_in_executor(None, f, *args, **kwargs)
+#
+#     return wrapped
+#
 
 
 class Descargador:
-    filename_re = compile(r'filename="(.+)"')
-    caracteres_prohibidos = compile(r"\[|\\|\/|\*|\?|\:|\"|\'|<|>|\||\]")
-    verdadero_ext = compile(r"\.\w+")
+    HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36"
+    }
+
+    FILENAME_RE = compile(r'filename="(.+)"')
+    CARACTERES_PROHIBIDOS = compile(r"\[|\\|\/|\*|\?|\:|\"|\'|<|>|\||\]")
 
     def __init__(self, headers=None):
-        self.headers = (
-            {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36"
-            }
-            if headers is None
-            else headers
-        )
+        self.headers = self.HEADERS if headers is None else headers
 
     def get(self, url: str, opciones: Optional[dict[str, Any]] = None):
         resp = requests.get(url, headers=self.headers, params=opciones)
@@ -54,28 +53,14 @@ class Descargador:
     def definir_nombre(
         self, url: str, resp: requests.Response, ruta: Optional[Path] = None
     ):
-
         try:
             content_d = resp.headers["Content-Disposition"]
 
-            content_match = self.filename_re.search(content_d)
+            content_match = self.FILENAME_RE.search(content_d)
 
             assert content_match is not None
 
-            ruta_d = Path(content_match[1])
-
-            if ruta is None:
-
-                return ruta_d
-            else:
-
-                if ruta.is_dir():
-
-                    return ruta / ruta_d
-
-                ruta = ruta.with_stem(self.caracteres_prohibidos.sub("", ruta.stem))
-
-                return ruta.with_suffix(ruta_d.suffix)
+            ruta_provisional = Path(content_match[1])
 
         except (KeyError, AssertionError):
             ruta_provisional = Path(url)
@@ -89,62 +74,60 @@ class Descargador:
                     ext = "." + ext.split("/")[1]
 
                 except KeyError:
-
                     raise ValueError(
                         f"el link {url} no pudo ser conseguido: no tiene header de disposicion, contenido, o url con extension valida."
                     )
 
-            ruta_provisional = Path(
-                self.caracteres_prohibidos.sub("", ruta_provisional.stem)
-            ).with_suffix(ext)
+                else:
+                    ruta_provisional = ruta_provisional.with_suffix(ext)
 
-            if ruta is None:
-                return ruta_provisional
+        if ruta is None:
+            return ruta_provisional.with_stem(
+                self.CARACTERES_PROHIBIDOS.sub("", ruta_provisional.stem)
+            )
 
-            else:
-                if ruta.is_dir():
+        else:
+            if ruta.is_dir():
+                return ruta / ruta_provisional
 
-                    return ruta / ruta_provisional
+            ruta = ruta.with_stem(self.CARACTERES_PROHIBIDOS.sub("", ruta.stem))
 
-                ruta = ruta.with_stem(self.caracteres_prohibidos.sub("", ruta.stem))
-
-                return ruta.with_suffix(ext)
+            return ruta.with_suffix(ruta_provisional.suffix)
 
     # @background
     def __call__(
-        self, url: str, ruta: Optional[Path] = None, chunk_size: Optional[int] = 1024
+        self,
+        url: str,
+        ruta: Optional[Path] = None,
+        chunk_size: Optional[int] = 1024,
+        barra_progreso=True,
     ) -> None:
-
         with requests.get(url, stream=True) as resp:
             resp.raise_for_status()
 
             ruta = self.definir_nombre(url, resp, ruta)
 
             with ruta.open("wb") as wfile:
-                total = int(resp.headers.get("content-length", 0))
+                if barra_progreso:
 
-                tqdm_params = {
-                    "desc": f"{ruta.stem:.30s}",
-                    "total": total,
-                    "miniters": 1,
-                    "unit": "B",
-                    "unit_scale": True,
-                    "unit_divisor": chunk_size,
-                }
+                    total = int(resp.headers.get("content-length", 0))
 
-                with tqdm(**tqdm_params) as barra:
+                    tqdm_params = {
+                        "desc": f"{ruta.stem:.30s}",
+                        "total": total,
+                        "miniters": 1,
+                        "unit": "B",
+                        "unit_scale": True,
+                        "unit_divisor": chunk_size,
+                    }
+
+                    with tqdm(**tqdm_params) as barra:
+                        for chunk in resp.iter_content(chunk_size=chunk_size):
+                            wfile.write(chunk)
+                            barra.update(len(chunk))
+                else:
                     for chunk in resp.iter_content(chunk_size=chunk_size):
                         wfile.write(chunk)
-                        barra.update(len(chunk))
-
-    def menor(self, url: str, ruta: Optional[Path] = None):
-        resp = self.get(url)
-
-        ruta_archivo = self.definir_nombre(url, resp, ruta)
-
-        with ruta_archivo.open("wb") as wf:
-
-            wf.write(resp.content)
 
 
 class BuscadorLibgen:
@@ -225,7 +208,6 @@ class BuscadorLibgen:
         pagina: Optional[int] = None,
         **_,
     ):
-
         opciones = {
             "req": " ".join(query),
             "columns": columna_busqueda,
@@ -316,6 +298,8 @@ class BuscadorLibgen:
         if seleccion is None:
             raise SystemExit("Nada Seleccionado")
 
+        enlaces = []
+
         for entrada in seleccion:
             idx = int(entrada[:3]) - 1  # type: ignore
 
@@ -326,23 +310,28 @@ class BuscadorLibgen:
             sopa = BeautifulSoup(resp.content, "html.parser")
 
             try:
-
                 enlace = urljoin(
-                    self.ENLACE_DESCARGA, sopa.find("tr").a["href"] # type:ignore
-                )  
+                    self.ENLACE_DESCARGA, sopa.find("tr").a["href"]  # type:ignore
+                )
 
             except AttributeError:
-
                 print(f"enlace descarga no hallado para {res['links']}")
 
                 continue
 
             else:
+                enlaces.append(enlace)
 
                 try:
                     self.desc(enlace, Rutas.DL.value / res["titulo"])
                 except requests.HTTPError:
                     continue
+
+                except KeyboardInterrupt:
+                    print("descarga interrumpida. Enlaces obtenidos hasta ahora:")
+
+                    for enlace in enlaces:
+                        print(enlace)
 
 
 def conseguir_parser():
