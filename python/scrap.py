@@ -13,115 +13,15 @@ from typing import Any, Iterator, Optional
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Tag
-import requests
 from tqdm import tqdm
 
 from recetas.recetas_argparse import ParserArgumentosSeguidores
 from system_admin.files import Rutas
+from scrapear import Descargador
 
 nombre_sitio = compile(r"https:\/\/(?:www\.)?([^\/]*)\..*\/")
 
 numeros_iniciales = compile(r"^\d+")
-
-
-# clases principales para descargar imagenes y procesar el html
-class Descargador:
-    HEADERS = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36"
-    }
-
-    FILENAME_RE = compile(r'filename="(.+)"')
-    CARACTERES_PROHIBIDOS = compile(r"\[|\\|\/|\*|\?|\:|\"|\'|<|>|\||\]")
-
-    def __init__(self, headers=None):
-        self.headers = self.HEADERS if headers is None else headers
-
-    def get(self, url: str, opciones: Optional[dict[str, Any]] = None):
-        resp = requests.get(url, headers=self.headers, params=opciones)
-
-        resp.raise_for_status()
-
-        return resp
-
-    def definir_nombre(
-        self, url: str, resp: requests.Response, ruta: Optional[Path] = None
-    ):
-        try:
-            content_d = resp.headers["Content-Disposition"]
-
-            content_match = self.FILENAME_RE.search(content_d)
-
-            assert content_match is not None
-
-            ruta_provisional = Path(content_match[1])
-
-        except (KeyError, AssertionError):
-            ruta_provisional = Path(url)
-
-            ext = ruta_provisional.suffix
-
-            if not ext:
-                try:
-                    ext = resp.headers["Content-Type"]
-
-                    ext = "." + ext.split("/")[1]
-
-                except KeyError:
-                    raise ValueError(
-                        f"el link {url} no pudo ser conseguido: no tiene header de disposicion, contenido, o url con extension valida."
-                    )
-
-                else:
-                    ruta_provisional = ruta_provisional.with_suffix(ext)
-
-        if ruta is None:
-            return ruta_provisional.with_stem(
-                self.CARACTERES_PROHIBIDOS.sub("", ruta_provisional.stem)
-            )
-
-        else:
-            if ruta.is_dir():
-                return ruta / ruta_provisional
-
-            ruta = ruta.with_stem(self.CARACTERES_PROHIBIDOS.sub("", ruta.stem))
-
-            return ruta.with_suffix(ruta_provisional.suffix)
-
-    # @background
-    def __call__(
-        self,
-        url: str,
-        ruta: Optional[Path] = None,
-        chunk_size: Optional[int] = 1024,
-        barra_progreso=True,
-    ) -> None:
-        with requests.get(url, stream=True) as resp:
-            resp.raise_for_status()
-
-            ruta = self.definir_nombre(url, resp, ruta)
-
-            with ruta.open("wb") as wfile:
-                if barra_progreso:
-
-                    total = int(resp.headers.get("content-length", 0))
-
-                    tqdm_params = {
-                        "desc": f"{ruta.stem:.30s}",
-                        "total": total,
-                        "miniters": 1,
-                        "unit": "B",
-                        "unit_scale": True,
-                        "unit_divisor": chunk_size,
-                    }
-
-                    with tqdm(**tqdm_params) as barra:
-                        for chunk in resp.iter_content(chunk_size=chunk_size):
-                            wfile.write(chunk)
-                            barra.update(len(chunk))
-                else:
-                    for chunk in resp.iter_content(chunk_size=chunk_size):
-                        wfile.write(chunk)
-
 
 class _RaspadorBasico:
     eliminar_extra_espacios = compile(r" {2,}")
