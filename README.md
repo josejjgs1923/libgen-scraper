@@ -1,4 +1,4 @@
-# libg.py
+# libgen-scraper
 
 python script to search and donwload libgen.li files
 
