@@ -28,7 +28,7 @@ class BuscadorLibgen:
 
     ENLACE_BUSQUEDA = MIRROR + "/" + "index.php"
 
-    ENLACE_DESCARGA = "https://libgen.rocks"
+    ENLACE_DESCARGA = "https://libgen.li"
 
     CATEGORIAS_BUSQUEDA = (
         "author",
