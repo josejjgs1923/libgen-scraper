@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Descargar Libros de la pagina de genesis library, 
+Descargar Libros de la pagina de genesis library,
 usando una query y opciones de busqueda.
 """
 
@@ -20,6 +20,7 @@ from system_admin.files import Rutas
 from scrapear import Descargador
 
 numeros_iniciales = compile(r"^\d+")
+
 
 class BuscadorLibgen:
     CARACTERES_ESPACIO_RE = compile(r"\r")
