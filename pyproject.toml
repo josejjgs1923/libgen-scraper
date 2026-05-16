@@ -8,6 +8,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "scrapear",
+  "system_admin",
   "tqdm",
   "beautifulsoup4",
 ]
@@ -15,6 +16,7 @@ dependencies = [
 
 [tool.uv.sources]
 scrapear = { path = "../scrapear", editable = true }
+system_admin = { path = "../system_admin", editable = true }
 
 [project.scripts]
 libg = "libg.cli:main"
