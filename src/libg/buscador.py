@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 """
-Descargar Libros de la pagina de genesis library,
-usando una query y opciones de busqueda.
+Clase BuscadorLibgen, encargada de Descargar y procesar el html,
+y descargar los links encontrados
 """
-
-from argparse import REMAINDER, SUPPRESS, ArgumentParser
 
 # from asyncio import get_event_loop
 from pathlib import Path
@@ -14,12 +12,36 @@ from urllib.parse import urljoin
 from iterfzf import iterfzf
 
 from bs4 import BeautifulSoup
-import requests
 
 from system_admin.files import Rutas
 from scrapear import Descargador
 
 numeros_iniciales = compile(r"^\d+")
+
+CATEGORIAS_BUSQUEDA = (
+    "author",
+    "title",
+    "publisher",
+    "year",
+    "isbn",
+    "language",
+    "md5",
+    "tags",
+    "extension",
+)
+
+CATEGORIAS_SORTEO = (
+    "id",
+    "author",
+    "title",
+    "publisher",
+    "year",
+    "pages",
+    "language",
+    "filesize",
+    "extension",
+)
+
 
 
 class BuscadorLibgen:
@@ -31,29 +53,9 @@ class BuscadorLibgen:
 
     ENLACE_DESCARGA = "https://libgen.li"
 
-    CATEGORIAS_BUSQUEDA = (
-        "author",
-        "title",
-        "publisher",
-        "year",
-        "isbn",
-        "language",
-        "md5",
-        "tags",
-        "extension",
-    )
+    CATEGORIAS_BUSQUEDA = CATEGORIAS_BUSQUEDA
 
-    CATEGORIAS_SORTEO = (
-        "id",
-        "author",
-        "title",
-        "publisher",
-        "year",
-        "pages",
-        "language",
-        "filesize",
-        "extension",
-    )
+    CATEGORIAS_SORTEO = CATEGORIAS_SORTEO 
 
     ATTR_RESULTADOS = (
         "titulo",
@@ -216,8 +218,6 @@ class BuscadorLibgen:
 
                 try:
                     self.desc(enlace, Rutas.DL.value / res["titulo"])
-                except requests.HTTPError:
-                    continue
 
                 except KeyboardInterrupt:
                     print("descarga interrumpida. Enlaces obtenidos hasta ahora:")
@@ -226,85 +226,6 @@ class BuscadorLibgen:
                         print(enlace)
 
 
-def conseguir_parser():
-    parser = ArgumentParser(description=__doc__)
-
-    # opciones globales
-
-    parser.add_argument(
-        "-b",
-        "--buscar",
-        dest="columna_busqueda",
-        default=SUPPRESS,
-        choices=BuscadorLibgen.CATEGORIAS_BUSQUEDA,
-        help=f"La query se interpreta como el vslor de este argumento. Categorias validas son: {', '.join(BuscadorLibgen.CATEGORIAS_BUSQUEDA)}. por defecto es titulo (title)",
-    )
-
-    # opciones individuales
-
-    parser.add_argument(
-        "-n",
-        "--numero",
-        dest="cantidad_resultados",
-        default=SUPPRESS,
-        type=int,
-        help="Numero de resultados maximo por pagina. Por defecto 100.",
-    )
-
-    parser.add_argument(
-        "-s",
-        "--sortear",
-        dest="sorteo",
-        default=SUPPRESS,
-        choices=BuscadorLibgen.CATEGORIAS_SORTEO,
-        help="Ordenar resultados por la categoria dada. Categorias validas son:"
-        + ", ".join(BuscadorLibgen.CATEGORIAS_SORTEO)
-        + ". Por defecto titulo (title).",
-    )
-
-    parser.add_argument(
-        "-r",
-        "--invertir",
-        dest="orden_sorteo",
-        action="store_true",
-        help="Invertir orden de resultados, orden descendiente.",
-    )
-
-    parser.add_argument(
-        "-p",
-        "-d",
-        "--profundidad",
-        dest="profundidad",
-        default=10,
-        type=int,
-        help="Cantidad de paginas resultado a recorrer. por defecto 10.",
-    )
-
-    parser.add_argument(
-        dest="query",
-        nargs=REMAINDER,
-        help="Terminos de busqueda para iniciar.",
-    )
-
-    return parser
-
-
-def main():
-    parser = conseguir_parser()
-
-    # procesar opciones
-    opts = parser.parse_args()
-
-    # ruta = Path().home() / "pagina.html"
-
-    buscador = BuscadorLibgen()
-
-    opciones = buscador.definir_opciones_busqueda(**opts.__dict__)
-
-    buscador.buscar(opciones)
-
-    buscador.lanzar_fzf()
-
 
 if __name__ == "__main__":
-    main()
+    pass
